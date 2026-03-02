@@ -34,6 +34,17 @@ create table if not exists internal_customers (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists authorized_reseller_domains (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references internal_customers(id) on delete set null,
+  customer_external_id text,
+  customer_name text,
+  domain text not null unique,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists reseller_targets (
   id uuid primary key default gen_random_uuid(),
   competitor_id uuid references competitors(id) on delete set null,
@@ -282,6 +293,9 @@ create index if not exists idx_internal_sales_lines_product_sold_at
 
 create index if not exists idx_internal_sales_lines_customer_sold_at
   on internal_sales_lines (customer_id, sold_at desc);
+
+create index if not exists idx_authorized_reseller_domain_active
+  on authorized_reseller_domains (domain, active);
 
 create index if not exists idx_reseller_targets_rank_enabled
   on reseller_targets (priority_rank, enabled);

@@ -8,6 +8,7 @@ Detta repo innehåller en konkret grundspec för en prisbevaknings- och prissät
 - Google Shopping-check i backend via Serper + valfri Scraperdog-verifiering
 - Multi-country EAN/UPC-check och enkel UI: `GET /ui/ean-check`
 - Intern sales-import API för kund/produkt/inpris + gråimportflaggor
+- Authorized reseller domain-register + `GET /api/check-market/{ean}` (is_authorized + marginal)
 
 ## Körbar backend-bas
 

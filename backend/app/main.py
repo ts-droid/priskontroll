@@ -2,6 +2,7 @@ import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
@@ -110,6 +111,43 @@ class GreyImportByEanResponse(BaseModel):
     items: list[GreyImportFlag]
 
 
+class AuthorizedResellerDomainItem(BaseModel):
+    customer_external_id: str | None = None
+    customer_name: str | None = None
+    domain: str
+    active: bool = True
+
+
+class AuthorizedResellerDomainBulkUpsertRequest(BaseModel):
+    items: list[AuthorizedResellerDomainItem] = Field(min_length=1, max_length=2000)
+
+
+class AuthorizedResellerDomainBulkUpsertResponse(BaseModel):
+    upserted: int
+
+
+class CheckMarketItem(BaseModel):
+    store: str
+    market: str
+    url: str | None = None
+    price: float
+    currency: str
+    is_authorized: bool
+    margin: float | None = None
+    domain: str | None = None
+    captured_at: datetime
+
+
+class CheckMarketResponse(BaseModel):
+    ean: str
+    product_name: str
+    wholesale_price: float | None = None
+    vat_rate: float
+    country_codes: list[str]
+    total_results: int
+    results: list[CheckMarketItem]
+
+
 def _ensure_internal_sales_tables() -> None:
     stmts = [
         """
@@ -144,9 +182,22 @@ def _ensure_internal_sales_tables() -> None:
           created_at timestamp not null default current_timestamp
         )
         """,
+        """
+        create table if not exists authorized_reseller_domains (
+          id text primary key,
+          customer_id text,
+          customer_external_id text,
+          customer_name text,
+          domain text not null unique,
+          active boolean not null default 1,
+          created_at timestamp not null default current_timestamp,
+          updated_at timestamp not null default current_timestamp
+        )
+        """,
         "create unique index if not exists idx_internal_sales_source_record on internal_sales_lines (source_system, external_record_id)",
         "create index if not exists idx_internal_sales_product_sold_at on internal_sales_lines (product_id, sold_at desc)",
         "create index if not exists idx_internal_sales_customer on internal_sales_lines (customer_id, sold_at desc)",
+        "create index if not exists idx_authorized_reseller_domain_active on authorized_reseller_domains (domain, active)",
     ]
     with engine.begin() as conn:
         for stmt in stmts:
@@ -177,6 +228,19 @@ def _parse_country_codes_csv(country_codes: str | None) -> list[str]:
     return [code.strip().upper() for code in country_codes.split(",") if code.strip()]
 
 
+def _extract_domain(url: str | None) -> str | None:
+    if not url:
+        return None
+    try:
+        parsed = urlparse(url)
+        host = parsed.netloc.lower().strip()
+        if host.startswith("www."):
+            host = host[4:]
+        return host or None
+    except Exception:
+        return None
+
+
 @app.on_event("startup")
 def bootstrap():
     _ensure_internal_sales_tables()
@@ -202,6 +266,74 @@ def db_ping():
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
     return {"db": "ok"}
+
+
+@app.get("/authorized-resellers/domains")
+def list_authorized_reseller_domains(active_only: bool = True):
+    with engine.begin() as conn:
+        if active_only:
+            rows = conn.execute(
+                text(
+                    """
+                    select customer_external_id, customer_name, domain, active
+                    from authorized_reseller_domains
+                    where active = 1
+                    order by domain asc
+                    """
+                )
+            ).mappings().all()
+        else:
+            rows = conn.execute(
+                text(
+                    """
+                    select customer_external_id, customer_name, domain, active
+                    from authorized_reseller_domains
+                    order by domain asc
+                    """
+                )
+            ).mappings().all()
+    return {"count": len(rows), "items": [dict(row) for row in rows]}
+
+
+@app.post(
+    "/authorized-resellers/domains/bulk-upsert",
+    response_model=AuthorizedResellerDomainBulkUpsertResponse,
+)
+def bulk_upsert_authorized_reseller_domains(
+    payload: AuthorizedResellerDomainBulkUpsertRequest,
+):
+    upserted = 0
+    with engine.begin() as conn:
+        for item in payload.items:
+            domain = item.domain.strip().lower()
+            if domain.startswith("www."):
+                domain = domain[4:]
+            conn.execute(
+                text(
+                    """
+                    insert into authorized_reseller_domains (
+                      id, customer_external_id, customer_name, domain, active, updated_at
+                    )
+                    values (
+                      :id, :customer_external_id, :customer_name, :domain, :active, current_timestamp
+                    )
+                    on conflict(domain) do update set
+                      customer_external_id = excluded.customer_external_id,
+                      customer_name = excluded.customer_name,
+                      active = excluded.active,
+                      updated_at = excluded.updated_at
+                    """
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "customer_external_id": item.customer_external_id,
+                    "customer_name": item.customer_name,
+                    "domain": domain,
+                    "active": item.active,
+                },
+            )
+            upserted += 1
+    return AuthorizedResellerDomainBulkUpsertResponse(upserted=upserted)
 
 
 @app.get("/ui/ean-check", response_class=HTMLResponse)
@@ -816,4 +948,127 @@ def grey_import_by_ean(
         country_codes=[code.lower() for code in selected_markets],
         total_flags=len(items),
         items=items,
+    )
+
+
+@app.get(
+    "/api/check-market/{ean}",
+    response_model=CheckMarketResponse,
+)
+def check_market(
+    ean: str,
+    country_codes: str | None = None,
+    vat_rate: float = 25.0,
+):
+    safe_vat = max(0.0, min(vat_rate, 50.0))
+    allowed_markets = set(_allowed_markets())
+    requested_markets = _parse_country_codes_csv(country_codes)
+
+    if requested_markets:
+        invalid = [code for code in requested_markets if code not in allowed_markets]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported markets requested: {', '.join(invalid)}. Allowed: {', '.join(sorted(allowed_markets))}",
+            )
+        selected_markets = requested_markets
+    else:
+        selected_markets = _default_markets()
+
+    with engine.begin() as conn:
+        product = conn.execute(
+            text(
+                """
+                select id, name, cost, currency
+                from products
+                where ean = :ean
+                limit 1
+                """
+            ),
+            {"ean": ean},
+        ).mappings().first()
+        if not product:
+            raise HTTPException(status_code=404, detail="Produkten finns inte i DB")
+
+        market_params: dict[str, str] = {}
+        placeholders = []
+        for idx, market in enumerate(selected_markets):
+            key = f"market_{idx}"
+            market_params[key] = market
+            placeholders.append(f":{key}")
+        market_filter = ", ".join(placeholders) if placeholders else "''"
+
+        offer_query = f"""
+            select
+              ro.market,
+              ro.effective_price,
+              ro.currency,
+              ro.offer_url,
+              ro.captured_at,
+              c.name as reseller_name
+            from reseller_offers ro
+            left join competitors c on c.id = ro.competitor_id
+            where ro.product_id = :product_id
+              and ro.market in ({market_filter})
+            order by ro.captured_at desc
+            limit 500
+        """
+
+        offers = conn.execute(
+            text(offer_query),
+            {"product_id": str(product["id"]), **market_params},
+        ).mappings().all()
+
+        domain_rows = conn.execute(
+            text(
+                """
+                select domain
+                from authorized_reseller_domains
+                where active = 1
+                """
+            )
+        ).mappings().all()
+
+    authorized_domains = [str(row["domain"]).lower() for row in domain_rows]
+    wholesale = float(product["cost"]) if product["cost"] is not None else None
+
+    results: list[CheckMarketItem] = []
+    for row in offers:
+        domain = _extract_domain(row["offer_url"])
+        is_authorized = False
+        if domain:
+            is_authorized = any(
+                domain == approved or domain.endswith(f".{approved}")
+                for approved in authorized_domains
+            )
+
+        gross_price = float(row["effective_price"])
+        margin = None
+        if wholesale is not None and gross_price > 0:
+            net_price = gross_price / (1 + safe_vat / 100.0)
+            if net_price > 0:
+                margin = round(((net_price - wholesale) / net_price) * 100.0, 1)
+
+        results.append(
+            CheckMarketItem(
+                store=row["reseller_name"] or domain or "Unknown store",
+                market=str(row["market"]).lower(),
+                url=row["offer_url"],
+                price=gross_price,
+                currency=(row["currency"] or product["currency"] or "SEK"),
+                is_authorized=is_authorized,
+                margin=margin,
+                domain=domain,
+                captured_at=row["captured_at"],
+            )
+        )
+
+    return CheckMarketResponse(
+        ean=ean,
+        product_name=str(product["name"]),
+        wholesale_price=wholesale,
+        vat_rate=safe_vat,
+        country_codes=[code.lower() for code in selected_markets],
+        total_results=len(results),
+        results=results,
     )

@@ -723,6 +723,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/InternalSalesImportResponse"
 
+  /authorized-resellers/domains:
+    get:
+      summary: List authorized reseller domains
+      parameters:
+        - in: query
+          name: active_only
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Authorized reseller domain list
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /authorized-resellers/domains/bulk-upsert:
+    post:
+      summary: Create or update authorized reseller domains
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizedResellerDomainBulkUpsertRequest"
+      responses:
+        "200":
+          description: Upsert status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorizedResellerDomainBulkUpsertResponse"
+
   /analytics/internal-sales/by-ean/{ean}:
     get:
       summary: List internal sales records for a specific EAN/UPC
@@ -800,6 +834,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GreyImportByEanResponse"
+
+  /api/check-market/{ean}:
+    get:
+      summary: Check market offers for an EAN and compute authorization and margin
+      parameters:
+        - in: path
+          name: ean
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: country_codes
+          description: Comma-separated country codes, e.g. se,no,dk
+          schema:
+            type: string
+        - in: query
+          name: vat_rate
+          schema:
+            type: number
+            format: double
+            default: 25
+      responses:
+        "200":
+          description: Market check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckMarketResponse"
 
 components:
   parameters:
@@ -1901,3 +1963,93 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GreyImportFlag"
+
+    AuthorizedResellerDomainItem:
+      type: object
+      required: [domain]
+      properties:
+        customer_external_id:
+          type: string
+          nullable: true
+        customer_name:
+          type: string
+          nullable: true
+        domain:
+          type: string
+        active:
+          type: boolean
+          default: true
+
+    AuthorizedResellerDomainBulkUpsertRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 2000
+          items:
+            $ref: "#/components/schemas/AuthorizedResellerDomainItem"
+
+    AuthorizedResellerDomainBulkUpsertResponse:
+      type: object
+      required: [upserted]
+      properties:
+        upserted:
+          type: integer
+
+    CheckMarketItem:
+      type: object
+      required: [store, market, price, currency, is_authorized, captured_at]
+      properties:
+        store:
+          type: string
+        market:
+          type: string
+        url:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+        currency:
+          type: string
+        is_authorized:
+          type: boolean
+        margin:
+          type: number
+          format: double
+          nullable: true
+        domain:
+          type: string
+          nullable: true
+        captured_at:
+          type: string
+          format: date-time
+
+    CheckMarketResponse:
+      type: object
+      required:
+        [ean, product_name, vat_rate, country_codes, total_results, results]
+      properties:
+        ean:
+          type: string
+        product_name:
+          type: string
+        wholesale_price:
+          type: number
+          format: double
+          nullable: true
+        vat_rate:
+          type: number
+          format: double
+        country_codes:
+          type: array
+          items:
+            type: string
+        total_results:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckMarketItem"
