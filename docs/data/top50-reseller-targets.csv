@@ -1,0 +1,51 @@
+priority_rank,name,country_code,annual_revenue,revenue_change_pct,strategy,domain,crawl_frequency_minutes,enabled,notes
+1,Dustin AB,SE,1255498,-18.8,direct_scrape,,180,true,
+2,Elkjop Nordic AS,NO,1214918,-20.1,direct_scrape,,180,true,
+3,ELKO ehf,IS,1106113,89.0,search_then_scrape,,240,true,
+4,Proshop,DK,833419,57.2,direct_scrape,,180,true,
+5,Eplehuset Norge AS,NO,823807,19.3,direct_scrape,,240,true,
+6,Komplett Services AS,NO,688178,-18.5,direct_scrape,,180,true,
+7,Play Nojesdistribution AB,SE,650397,216.9,search_then_scrape,,360,true,
+8,Coolshop Entertainment Trading ApS,DK,476036,40.8,direct_scrape,,240,true,
+9,Verkkokauppa Oyj,FI,462127,-13.2,direct_scrape,,240,true,
+10,Inet AB,SE,447265,76.8,direct_scrape,,180,true,
+11,Atea Logistics AB,SE,386770,-9.9,manual,,720,true,B2B profile likely
+12,NetOnNet AB,SE,283110,169.2,direct_scrape,,180,true,
+13,Dahlgren Retail Group AB,SE,282883,-3.2,search_then_scrape,,360,true,
+14,COMM2IG A/S,DK,219858,14.0,manual,,720,true,B2B profile likely
+15,Foxway AB,SE,212144,15.1,manual,,720,true,B2B profile likely
+16,SHELTER PL SP Z O O,PL,176550,,search_then_scrape,,720,true,
+17,Varle UAB,LT,158992,178.9,search_then_scrape,,720,true,
+18,Webhallen Sverige AB,SE,148102,54.0,direct_scrape,,180,true,
+19,MauLund A/S,DK,141873,-26.8,search_then_scrape,,720,true,
+20,Kjell och Company Elektronik AB,SE,130811,-13.8,direct_scrape,,180,true,
+21,C&C Lithuania UAB,LT,114035,-26.4,manual,,720,true,B2B profile likely
+22,Scandinavian Photo AB,SE,111312,99.1,direct_scrape,,240,true,
+23,Av-Cables ApS,DK,109014,-50.3,direct_scrape,,240,true,
+24,Brodrene A o O Johansen A/S,DK,102720,-13.1,manual,,720,true,B2B profile likely
+25,Lifestylestore.se,SE,80186,-55.9,direct_scrape,,360,true,
+26,avXperten ApS,DK,75084,-11.2,direct_scrape,,360,true,
+27,Foniks Computer,DK,70102,20.5,search_then_scrape,,720,true,
+28,Infografikk AS,NO,69413,11.6,manual,,720,true,B2B profile likely
+29,CS Online A/S,DK,62043,-25.9,search_then_scrape,,720,true,
+30,ITF Partner AB,SE,60791,,manual,,720,true,B2B profile likely
+31,C&C Sweden AB,SE,60128,-64.9,manual,,720,true,B2B profile likely
+32,IT relation,DK,59060,,manual,,720,true,B2B profile likely
+33,C&C EE OU Latvijas filiale,LV,49912,-85.2,manual,,720,true,B2B profile likely
+34,Janssondata AB,SE,42457,42.0,search_then_scrape,,720,true,
+35,Compliq IT AB,SE,41740,30.5,manual,,720,true,B2B profile likely
+36,AJ Produkter AB,SE,39906,81.5,manual,,720,true,B2B profile likely
+37,Blue Line A/S,DK,38747,102.6,search_then_scrape,,720,true,
+38,Multitronic OY,FI,35713,-43.4,direct_scrape,,360,true,
+39,Danira Telecom AB,SE,32611,206.3,search_then_scrape,,720,true,
+40,Bauhaus Co Ky,FI,26423,,direct_scrape,,360,true,
+41,Smarta Saker i Stockholm AB,SE,24443,-45.2,direct_scrape,,360,true,
+42,Bauhaus Co KB,SE,20619,-68.1,direct_scrape,,360,true,
+43,Skalhuset.se Lowwi AB,SE,19778,-90.0,direct_scrape,,240,true,
+44,Data Garden A/S,DK,15670,11.7,manual,,720,true,B2B profile likely
+45,Zanity IT ApS,DK,15593,478.2,manual,,720,true,B2B profile likely
+46,Macpeople Oy,FI,13805,-89.0,direct_scrape,,360,true,
+47,C&C EE OU,EE,13047,21.0,manual,,720,true,B2B profile likely
+48,Nikostine ApS,DK,12801,,search_then_scrape,,720,true,
+49,Topo Grupe UAB,LT,11737,-94.1,search_then_scrape,,720,true,
+50,Compwise AB,SE,11248,177.9,manual,,720,true,B2B profile likely

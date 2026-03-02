@@ -1,0 +1,1578 @@
+openapi: 3.1.0
+info:
+  title: Priskontroll API
+  version: 0.1.0
+  description: API contract for product catalog, price monitoring, rule-based pricing, and integrations.
+servers:
+  - url: https://api.priskontroll.local/v1
+paths:
+  /products:
+    get:
+      summary: List products
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+    post:
+      summary: Create product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{productId}:
+    get:
+      summary: Get product
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    patch:
+      summary: Update product
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{productId}/price-history:
+    get:
+      summary: List product price history
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PriceHistoryEntry"
+
+  /products/{productId}/competitor-prices:
+    get:
+      summary: Latest competitor prices per source
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Latest competitor prices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CompetitorPrice"
+
+  /sources:
+    get:
+      summary: List external sources
+      responses:
+        "200":
+          description: Source list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SourceConnection"
+    post:
+      summary: Add external source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceConnectionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceConnection"
+
+  /sources/{sourceId}/sync:
+    post:
+      summary: Trigger source sync
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [full, incremental]
+                  default: incremental
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceSyncRun"
+
+  /sources/{sourceId}/sync-runs:
+    get:
+      summary: List sync runs
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      responses:
+        "200":
+          description: Sync run list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SourceSyncRun"
+
+  /pricing-rules:
+    get:
+      summary: List pricing rules
+      responses:
+        "200":
+          description: Rule list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PricingRule"
+    post:
+      summary: Create pricing rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePricingRuleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRule"
+
+  /pricing-rules/{ruleId}:
+    patch:
+      summary: Update pricing rule
+      parameters:
+        - $ref: "#/components/parameters/RuleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePricingRuleRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRule"
+
+  /pricing-rules/simulate:
+    post:
+      summary: Simulate rule outcomes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ruleId, productIds]
+              properties:
+                ruleId:
+                  type: string
+                  format: uuid
+                productIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PriceDecision"
+
+  /price-decisions:
+    get:
+      summary: List latest pricing decisions
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [proposed, approved, rejected, applied]
+      responses:
+        "200":
+          description: Decisions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PriceDecision"
+
+  /price-decisions/{decisionId}/approve:
+    post:
+      summary: Approve and apply pricing decision
+      parameters:
+        - $ref: "#/components/parameters/DecisionId"
+      responses:
+        "200":
+          description: Decision approved and applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceDecision"
+
+  /alerts:
+    get:
+      summary: List active alerts
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Alert"
+    post:
+      summary: Create alert rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAlertRequest"
+      responses:
+        "201":
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+
+  /rrp-policies:
+    get:
+      summary: List RRP/MAP policies
+      parameters:
+        - in: query
+          name: brand
+          schema:
+            type: string
+        - in: query
+          name: market
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, expired, draft]
+      responses:
+        "200":
+          description: Policy list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RrpPolicy"
+    post:
+      summary: Create RRP/MAP policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRrpPolicyRequest"
+      responses:
+        "201":
+          description: Policy created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RrpPolicy"
+
+  /rrp-policies/{policyId}:
+    patch:
+      summary: Update RRP/MAP policy
+      parameters:
+        - $ref: "#/components/parameters/PolicyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRrpPolicyRequest"
+      responses:
+        "200":
+          description: Policy updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RrpPolicy"
+
+  /reseller-offers:
+    get:
+      summary: List observed reseller offers
+      parameters:
+        - in: query
+          name: productId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: competitorId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Offer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResellerOffer"
+
+  /compliance-events:
+    get:
+      summary: List compliance events
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, in_review, resolved, dismissed]
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [p1, p2, p3]
+        - in: query
+          name: productId
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Compliance event list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComplianceEvent"
+
+  /compliance-events/{eventId}:
+    patch:
+      summary: Update compliance event status
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateComplianceEventRequest"
+      responses:
+        "200":
+          description: Compliance event updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceEvent"
+
+  /compliance-events/{eventId}/case:
+    post:
+      summary: Create case from compliance event
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaseRequest"
+      responses:
+        "201":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+
+  /cases:
+    get:
+      summary: List compliance follow-up cases
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, contacted, pending_reply, resolved, closed]
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: [low, normal, high, critical]
+      responses:
+        "200":
+          description: Case list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Case"
+
+  /cases/{caseId}:
+    patch:
+      summary: Update case workflow
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCaseRequest"
+      responses:
+        "200":
+          description: Case updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+
+  /reseller-targets:
+    get:
+      summary: List prioritized reseller targets
+      parameters:
+        - in: query
+          name: enabled
+          schema:
+            type: boolean
+        - in: query
+          name: countryCode
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Reseller target list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResellerTarget"
+    post:
+      summary: Create reseller target
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResellerTargetRequest"
+      responses:
+        "201":
+          description: Target created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResellerTarget"
+
+  /reseller-targets/{targetId}:
+    patch:
+      summary: Update reseller target strategy or settings
+      parameters:
+        - $ref: "#/components/parameters/TargetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateResellerTargetRequest"
+      responses:
+        "200":
+          description: Target updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResellerTarget"
+
+  /reseller-targets/{targetId}/discover:
+    post:
+      summary: Discover/update product URLs for a target (e.g. Serper + crawl)
+      parameters:
+        - $ref: "#/components/parameters/TargetId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [full, incremental]
+                  default: incremental
+      responses:
+        "202":
+          description: Discovery accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferCaptureRun"
+
+  /reseller-targets/{targetId}/capture-runs:
+    get:
+      summary: List capture runs for reseller target
+      parameters:
+        - $ref: "#/components/parameters/TargetId"
+      responses:
+        "200":
+          description: Capture run list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OfferCaptureRun"
+
+  /integrations/google-shopping/check:
+    post:
+      summary: Check prices from Google Shopping via Serper, with optional Scraperdog verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleShoppingCheckRequest"
+      responses:
+        "200":
+          description: Google Shopping result list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleShoppingCheckResponse"
+
+components:
+  parameters:
+    ProductId:
+      in: path
+      name: productId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SourceId:
+      in: path
+      name: sourceId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RuleId:
+      in: path
+      name: ruleId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DecisionId:
+      in: path
+      name: decisionId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PolicyId:
+      in: path
+      name: policyId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EventId:
+      in: path
+      name: eventId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CaseId:
+      in: path
+      name: caseId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TargetId:
+      in: path
+      name: targetId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Product:
+      type: object
+      required: [id, sku, name, currentPrice, currency, minPrice, maxPrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        ean:
+          type: string
+          nullable: true
+        name:
+          type: string
+        category:
+          type: string
+          nullable: true
+        cost:
+          type: number
+          format: double
+        currentPrice:
+          type: number
+          format: double
+        currency:
+          type: string
+        minPrice:
+          type: number
+          format: double
+        maxPrice:
+          type: number
+          format: double
+        active:
+          type: boolean
+
+    CreateProductRequest:
+      type: object
+      required: [sku, name, currentPrice, currency, minPrice, maxPrice]
+      properties:
+        sku:
+          type: string
+        ean:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        cost:
+          type: number
+          format: double
+        currentPrice:
+          type: number
+          format: double
+        currency:
+          type: string
+        minPrice:
+          type: number
+          format: double
+        maxPrice:
+          type: number
+          format: double
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        cost:
+          type: number
+          format: double
+        minPrice:
+          type: number
+          format: double
+        maxPrice:
+          type: number
+          format: double
+        active:
+          type: boolean
+
+    CompetitorPrice:
+      type: object
+      required: [productId, competitorName, price, currency, capturedAt]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        competitorName:
+          type: string
+        sourceType:
+          type: string
+          enum: [api, scraper, csv]
+        price:
+          type: number
+          format: double
+        shipping:
+          type: number
+          format: double
+        inStock:
+          type: boolean
+        promoText:
+          type: string
+          nullable: true
+        currency:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+
+    PriceHistoryEntry:
+      type: object
+      required: [productId, oldPrice, newPrice, reason, changedAt]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        oldPrice:
+          type: number
+          format: double
+        newPrice:
+          type: number
+          format: double
+        reason:
+          type: string
+        decisionId:
+          type: string
+          format: uuid
+          nullable: true
+        changedAt:
+          type: string
+          format: date-time
+
+    SourceConnection:
+      type: object
+      required: [id, name, sourceType, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [shopify, woocommerce, csv, rest, graphql]
+        baseUrl:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, paused, error]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateSourceConnectionRequest:
+      type: object
+      required: [name, sourceType]
+      properties:
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [shopify, woocommerce, csv, rest, graphql]
+        baseUrl:
+          type: string
+        auth:
+          type: object
+          description: Opaque auth payload, stored encrypted server-side.
+          additionalProperties: true
+
+    SourceSyncRun:
+      type: object
+      required: [id, sourceId, startedAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+        mode:
+          type: string
+          enum: [full, incremental]
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [running, success, failed]
+        stats:
+          type: object
+          additionalProperties: true
+
+    PricingRule:
+      type: object
+      required: [id, name, strategy, enabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        strategy:
+          type: string
+          enum: [match_lowest, second_lowest, cost_plus, fixed, margin_guard]
+        scope:
+          type: object
+          description: Defines target products/categories/brands.
+          additionalProperties: true
+        config:
+          type: object
+          description: Strategy specific config values.
+          additionalProperties: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+
+    CreatePricingRuleRequest:
+      type: object
+      required: [name, strategy, config]
+      properties:
+        name:
+          type: string
+        strategy:
+          type: string
+          enum: [match_lowest, second_lowest, cost_plus, fixed, margin_guard]
+        scope:
+          type: object
+          additionalProperties: true
+        config:
+          type: object
+          additionalProperties: true
+        priority:
+          type: integer
+          default: 100
+
+    UpdatePricingRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        scope:
+          type: object
+          additionalProperties: true
+        config:
+          type: object
+          additionalProperties: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+
+    PriceDecision:
+      type: object
+      required: [id, productId, ruleId, oldPrice, suggestedPrice, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        ruleId:
+          type: string
+          format: uuid
+        oldPrice:
+          type: number
+          format: double
+        suggestedPrice:
+          type: number
+          format: double
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [proposed, approved, rejected, applied]
+        createdAt:
+          type: string
+          format: date-time
+        appliedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Alert:
+      type: object
+      required: [id, name, conditionType, channel, enabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        conditionType:
+          type: string
+          enum: [competitor_drop_pct, below_floor, sync_failed, large_price_change]
+        threshold:
+          type: number
+          format: double
+          nullable: true
+        channel:
+          type: string
+          enum: [email, slack, webhook]
+        target:
+          type: string
+        scope:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+
+    CreateAlertRequest:
+      type: object
+      required: [name, conditionType, channel, target]
+      properties:
+        name:
+          type: string
+        conditionType:
+          type: string
+          enum: [competitor_drop_pct, below_floor, sync_failed, large_price_change]
+        threshold:
+          type: number
+          format: double
+        channel:
+          type: string
+          enum: [email, slack, webhook]
+        target:
+          type: string
+        scope:
+          type: object
+          additionalProperties: true
+
+    RrpPolicy:
+      type: object
+      required: [id, brand, market, currency, minPrice, status, validFrom]
+      properties:
+        id:
+          type: string
+          format: uuid
+        brand:
+          type: string
+        market:
+          type: string
+        currency:
+          type: string
+        minPrice:
+          type: number
+          format: double
+        advisoryPrice:
+          type: number
+          format: double
+          nullable: true
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [active, expired, draft]
+        notes:
+          type: string
+          nullable: true
+
+    CreateRrpPolicyRequest:
+      type: object
+      required: [brand, market, currency, minPrice, validFrom]
+      properties:
+        brand:
+          type: string
+        market:
+          type: string
+        currency:
+          type: string
+        minPrice:
+          type: number
+          format: double
+        advisoryPrice:
+          type: number
+          format: double
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, expired, draft]
+          default: draft
+        notes:
+          type: string
+
+    UpdateRrpPolicyRequest:
+      type: object
+      properties:
+        minPrice:
+          type: number
+          format: double
+        advisoryPrice:
+          type: number
+          format: double
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, expired, draft]
+        notes:
+          type: string
+
+    ResellerOffer:
+      type: object
+      required:
+        [id, productId, competitorId, market, effectivePrice, currency, capturedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        competitorId:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+          nullable: true
+        market:
+          type: string
+        basePrice:
+          type: number
+          format: double
+          nullable: true
+        salePrice:
+          type: number
+          format: double
+          nullable: true
+        shippingPrice:
+          type: number
+          format: double
+        effectivePrice:
+          type: number
+          format: double
+        currency:
+          type: string
+        inStock:
+          type: boolean
+        promoType:
+          type: string
+          enum: [none, campaign, coupon, bundle, clearance]
+        promoText:
+          type: string
+          nullable: true
+        offerUrl:
+          type: string
+          nullable: true
+        capturedAt:
+          type: string
+          format: date-time
+
+    ComplianceEvent:
+      type: object
+      required:
+        [
+          id,
+          productId,
+          competitorId,
+          eventType,
+          severity,
+          status,
+          observedPrice,
+          thresholdPrice,
+          deviationAmount,
+          deviationPct,
+          detectedAt,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        competitorId:
+          type: string
+          format: uuid
+        offerId:
+          type: string
+          format: uuid
+          nullable: true
+        policyId:
+          type: string
+          format: uuid
+          nullable: true
+        eventType:
+          type: string
+          enum: [below_map, below_rrp, recovered, unverified]
+        severity:
+          type: string
+          enum: [p1, p2, p3]
+        status:
+          type: string
+          enum: [open, in_review, resolved, dismissed]
+        observedPrice:
+          type: number
+          format: double
+        thresholdPrice:
+          type: number
+          format: double
+        deviationAmount:
+          type: number
+          format: double
+        deviationPct:
+          type: number
+          format: double
+        evidence:
+          type: object
+          additionalProperties: true
+        detectedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateComplianceEventRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [open, in_review, resolved, dismissed]
+        note:
+          type: string
+
+    Case:
+      type: object
+      required: [id, status, priority, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        complianceEventId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [open, contacted, pending_reply, resolved, closed]
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        owner:
+          type: string
+          nullable: true
+        contactedAt:
+          type: string
+          format: date-time
+          nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCaseRequest:
+      type: object
+      properties:
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+          default: normal
+        owner:
+          type: string
+        notes:
+          type: string
+
+    UpdateCaseRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, contacted, pending_reply, resolved, closed]
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        owner:
+          type: string
+        contactedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    ResellerTarget:
+      type: object
+      required: [id, name, countryCode, priorityRank, strategy, enabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        competitorId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        countryCode:
+          type: string
+        priorityRank:
+          type: integer
+        annualRevenue:
+          type: number
+          format: double
+          nullable: true
+        revenueChangePct:
+          type: number
+          format: double
+          nullable: true
+        strategy:
+          type: string
+          enum: [direct_scrape, search_then_scrape, feed, manual]
+        domain:
+          type: string
+          nullable: true
+        searchQueries:
+          type: array
+          items:
+            type: string
+        crawlFrequencyMinutes:
+          type: integer
+        enabled:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+
+    CreateResellerTargetRequest:
+      type: object
+      required: [name, countryCode, priorityRank, strategy]
+      properties:
+        competitorId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        countryCode:
+          type: string
+        priorityRank:
+          type: integer
+        annualRevenue:
+          type: number
+          format: double
+        revenueChangePct:
+          type: number
+          format: double
+        strategy:
+          type: string
+          enum: [direct_scrape, search_then_scrape, feed, manual]
+        domain:
+          type: string
+        searchQueries:
+          type: array
+          items:
+            type: string
+        crawlFrequencyMinutes:
+          type: integer
+          default: 360
+        enabled:
+          type: boolean
+          default: true
+        notes:
+          type: string
+
+    UpdateResellerTargetRequest:
+      type: object
+      properties:
+        competitorId:
+          type: string
+          format: uuid
+        priorityRank:
+          type: integer
+        annualRevenue:
+          type: number
+          format: double
+        revenueChangePct:
+          type: number
+          format: double
+        strategy:
+          type: string
+          enum: [direct_scrape, search_then_scrape, feed, manual]
+        domain:
+          type: string
+        searchQueries:
+          type: array
+          items:
+            type: string
+        crawlFrequencyMinutes:
+          type: integer
+        enabled:
+          type: boolean
+        notes:
+          type: string
+
+    OfferCaptureRun:
+      type: object
+      required: [id, resellerTargetId, mode, status, startedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        resellerTargetId:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+          nullable: true
+        mode:
+          type: string
+          enum: [full, incremental]
+        status:
+          type: string
+          enum: [running, success, failed]
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        discoveredUrls:
+          type: integer
+        offersFound:
+          type: integer
+        stats:
+          type: object
+          additionalProperties: true
+
+    GoogleShoppingCheckRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 2
+          maxLength: 300
+        country_code:
+          type: string
+          default: se
+        language:
+          type: string
+          default: sv
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+        verify_with_scraperdog:
+          type: boolean
+          default: false
+
+    GoogleShoppingOffer:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        source:
+          type: string
+          nullable: true
+        product_url:
+          type: string
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+        listed_price_text:
+          type: string
+          nullable: true
+        listed_price_value:
+          type: number
+          format: double
+          nullable: true
+        verification_ok:
+          type: boolean
+          nullable: true
+        verification_title:
+          type: string
+          nullable: true
+
+    GoogleShoppingCheckResponse:
+      type: object
+      required: [query, country_code, language, total_found, verified_count, offers]
+      properties:
+        query:
+          type: string
+        country_code:
+          type: string
+        language:
+          type: string
+        total_found:
+          type: integer
+        verified_count:
+          type: integer
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/GoogleShoppingOffer"
