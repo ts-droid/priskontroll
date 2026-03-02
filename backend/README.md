@@ -22,6 +22,9 @@ Endpoints:
 - `GET /ui/ean-check`
 - `POST /integrations/google-shopping/check`
 - `POST /integrations/google-shopping/check-multi`
+- `POST /integrations/internal-sales/import`
+- `GET /analytics/internal-sales/by-ean/{ean}`
+- `GET /analytics/grey-import/flags`
 
 Notera: `DATABASE_URL` fallbackar till lokal sqlite (`sqlite:///./priskontroll.db`) om variabeln saknas.
 
@@ -66,3 +69,41 @@ Marknadsstyrning via env:
 
 - `ALLOWED_MARKETS=SE,NO,DK,FI,IS,LT,LV,EE,PL`
 - `DEFAULT_MARKETS=SE,NO,DK,FI`
+
+## Intern försäljningsdata (backend-system)
+
+Sätt gärna en skyddstoken:
+
+- `INTERNAL_SALES_IMPORT_TOKEN=<hemlig-token>`
+
+Exempelimport:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/integrations/internal-sales/import" \
+  -H "Content-Type: application/json" \
+  -H "X-Import-Token: <hemlig-token>" \
+  -d '{
+    "source_system":"erp",
+    "records":[
+      {
+        "external_record_id":"INV-1001-1",
+        "sold_at":"2026-03-01T12:00:00Z",
+        "customer_external_id":"CUST-001",
+        "customer_name":"Example Retailer AB",
+        "customer_country":"SE",
+        "product_sku":"SAT-USB4-HUB",
+        "product_ean":"810086361679",
+        "sold_price":699.0,
+        "currency":"SEK",
+        "quantity":2,
+        "destination_market":"SE",
+        "invoice_ref":"INV-1001"
+      }
+    ]
+  }'
+```
+
+Analys:
+
+- `GET /analytics/internal-sales/by-ean/810086361679?days=180`
+- `GET /analytics/grey-import/flags?lookback_days=120&min_deviation_pct=15`

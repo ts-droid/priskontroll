@@ -25,6 +25,15 @@ create table if not exists competitors (
   created_at timestamptz not null default now()
 );
 
+create table if not exists internal_customers (
+  id uuid primary key default gen_random_uuid(),
+  external_id text not null unique,
+  name text not null,
+  country_code char(2) not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists reseller_targets (
   id uuid primary key default gen_random_uuid(),
   competitor_id uuid references competitors(id) on delete set null,
@@ -103,6 +112,28 @@ create table if not exists source_records (
   payload jsonb not null,
   ingested_at timestamptz not null default now(),
   unique (source_id, external_id, record_type)
+);
+
+create table if not exists internal_sales_lines (
+  id uuid primary key default gen_random_uuid(),
+  source_system text not null,
+  external_record_id text not null,
+  sold_at timestamptz not null,
+  customer_id uuid not null references internal_customers(id) on delete cascade,
+  customer_external_id text not null,
+  customer_name text not null,
+  customer_country char(2) not null,
+  product_id uuid references products(id) on delete set null,
+  product_sku text,
+  product_ean text,
+  sold_price numeric(12,2) not null check (sold_price >= 0),
+  currency char(3) not null default 'SEK',
+  quantity integer not null default 1 check (quantity > 0),
+  destination_market char(2),
+  invoice_ref text,
+  order_ref text,
+  created_at timestamptz not null default now(),
+  unique (source_system, external_record_id)
 );
 
 create table if not exists competitor_prices (
@@ -245,6 +276,12 @@ create table if not exists cases (
 
 create index if not exists idx_competitor_prices_product_captured
   on competitor_prices (product_id, captured_at desc);
+
+create index if not exists idx_internal_sales_lines_product_sold_at
+  on internal_sales_lines (product_id, sold_at desc);
+
+create index if not exists idx_internal_sales_lines_customer_sold_at
+  on internal_sales_lines (customer_id, sold_at desc);
 
 create index if not exists idx_reseller_targets_rank_enabled
   on reseller_targets (priority_rank, enabled);

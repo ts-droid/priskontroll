@@ -700,6 +700,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/GoogleShoppingCheckMultiResponse"
 
+  /integrations/internal-sales/import:
+    post:
+      summary: Import sold customer-product price records from internal backend system
+      parameters:
+        - in: header
+          name: X-Import-Token
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalSalesImportRequest"
+      responses:
+        "200":
+          description: Import status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalSalesImportResponse"
+
+  /analytics/internal-sales/by-ean/{ean}:
+    get:
+      summary: List internal sales records for a specific EAN/UPC
+      parameters:
+        - in: path
+          name: ean
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 180
+      responses:
+        "200":
+          description: Sales records
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /analytics/grey-import/flags:
+    get:
+      summary: Flag potential grey-import offers based on deviation from internal sold prices
+      parameters:
+        - in: query
+          name: lookback_days
+          schema:
+            type: integer
+            default: 120
+        - in: query
+          name: min_deviation_pct
+          schema:
+            type: number
+            format: double
+            default: 15
+      responses:
+        "200":
+          description: Potential grey-import flags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GreyImportFlagsResponse"
+
 components:
   parameters:
     ProductId:
@@ -1643,3 +1711,138 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GoogleShoppingCountryResult"
+
+    InternalSalesRecord:
+      type: object
+      required:
+        [
+          external_record_id,
+          sold_at,
+          customer_external_id,
+          customer_name,
+          customer_country,
+          sold_price,
+        ]
+      properties:
+        external_record_id:
+          type: string
+        sold_at:
+          type: string
+          format: date-time
+        customer_external_id:
+          type: string
+        customer_name:
+          type: string
+        customer_country:
+          type: string
+        product_sku:
+          type: string
+          nullable: true
+        product_ean:
+          type: string
+          nullable: true
+        sold_price:
+          type: number
+          format: double
+        currency:
+          type: string
+          default: SEK
+        quantity:
+          type: integer
+          default: 1
+        destination_market:
+          type: string
+          nullable: true
+        invoice_ref:
+          type: string
+          nullable: true
+        order_ref:
+          type: string
+          nullable: true
+
+    InternalSalesImportRequest:
+      type: object
+      required: [source_system, records]
+      properties:
+        source_system:
+          type: string
+        records:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            $ref: "#/components/schemas/InternalSalesRecord"
+
+    InternalSalesImportResponse:
+      type: object
+      required: [source_system, imported, skipped_duplicates, unresolved_products]
+      properties:
+        source_system:
+          type: string
+        imported:
+          type: integer
+        skipped_duplicates:
+          type: integer
+        unresolved_products:
+          type: integer
+
+    GreyImportFlag:
+      type: object
+      required:
+        [
+          product_id,
+          product_name,
+          market,
+          observed_price,
+          baseline_min_sold_price,
+          baseline_avg_sold_price,
+          deviation_pct_vs_min,
+          captured_at,
+        ]
+      properties:
+        product_id:
+          type: string
+        product_sku:
+          type: string
+          nullable: true
+        product_ean:
+          type: string
+          nullable: true
+        product_name:
+          type: string
+        market:
+          type: string
+        reseller:
+          type: string
+          nullable: true
+        observed_price:
+          type: number
+          format: double
+        baseline_min_sold_price:
+          type: number
+          format: double
+        baseline_avg_sold_price:
+          type: number
+          format: double
+        deviation_pct_vs_min:
+          type: number
+          format: double
+        captured_at:
+          type: string
+          format: date-time
+
+    GreyImportFlagsResponse:
+      type: object
+      required: [lookback_days, min_deviation_pct, total_flags, items]
+      properties:
+        lookback_days:
+          type: integer
+        min_deviation_pct:
+          type: number
+          format: double
+        total_flags:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GreyImportFlag"

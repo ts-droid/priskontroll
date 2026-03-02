@@ -7,6 +7,7 @@ Detta repo innehåller en konkret grundspec för en prisbevaknings- och prissät
 - Connector-interface: `docs/connectors/interface.md`
 - Google Shopping-check i backend via Serper + valfri Scraperdog-verifiering
 - Multi-country EAN/UPC-check och enkel UI: `GET /ui/ean-check`
+- Intern sales-import API för kund/produkt/inpris + gråimportflaggor
 
 ## Körbar backend-bas
 
