@@ -768,6 +768,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/GreyImportFlagsResponse"
 
+  /analytics/grey-import/by-ean/{ean}:
+    get:
+      summary: Flag potential grey-import for a specific EAN/UPC, filtered by selected markets
+      parameters:
+        - in: path
+          name: ean
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: lookback_days
+          schema:
+            type: integer
+            default: 120
+        - in: query
+          name: min_deviation_pct
+          schema:
+            type: number
+            format: double
+            default: 15
+        - in: query
+          name: country_codes
+          description: Comma-separated country codes, e.g. se,no,dk
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Potential grey-import flags for selected EAN
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GreyImportByEanResponse"
+
 components:
   parameters:
     ProductId:
@@ -1840,6 +1873,28 @@ components:
         min_deviation_pct:
           type: number
           format: double
+        total_flags:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GreyImportFlag"
+
+    GreyImportByEanResponse:
+      type: object
+      required: [ean, lookback_days, min_deviation_pct, country_codes, total_flags, items]
+      properties:
+        ean:
+          type: string
+        lookback_days:
+          type: integer
+        min_deviation_pct:
+          type: number
+          format: double
+        country_codes:
+          type: array
+          items:
+            type: string
         total_flags:
           type: integer
         items:

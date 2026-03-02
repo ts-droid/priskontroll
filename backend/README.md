@@ -25,6 +25,7 @@ Endpoints:
 - `POST /integrations/internal-sales/import`
 - `GET /analytics/internal-sales/by-ean/{ean}`
 - `GET /analytics/grey-import/flags`
+- `GET /analytics/grey-import/by-ean/{ean}`
 
 Notera: `DATABASE_URL` fallbackar till lokal sqlite (`sqlite:///./priskontroll.db`) om variabeln saknas.
 
@@ -107,3 +108,4 @@ Analys:
 
 - `GET /analytics/internal-sales/by-ean/810086361679?days=180`
 - `GET /analytics/grey-import/flags?lookback_days=120&min_deviation_pct=15`
+- `GET /analytics/grey-import/by-ean/810086361679?lookback_days=120&min_deviation_pct=15&country_codes=se,no,dk,fi`

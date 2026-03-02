@@ -101,6 +101,15 @@ class GreyImportFlagsResponse(BaseModel):
     items: list[GreyImportFlag]
 
 
+class GreyImportByEanResponse(BaseModel):
+    ean: str
+    lookback_days: int
+    min_deviation_pct: float
+    country_codes: list[str]
+    total_flags: int
+    items: list[GreyImportFlag]
+
+
 def _ensure_internal_sales_tables() -> None:
     stmts = [
         """
@@ -160,6 +169,12 @@ def _resolve_product_id(conn, sku: str | None, ean: str | None) -> str | None:
         if result:
             return str(result)
     return None
+
+
+def _parse_country_codes_csv(country_codes: str | None) -> list[str]:
+    if not country_codes:
+        return []
+    return [code.strip().upper() for code in country_codes.split(",") if code.strip()]
 
 
 @app.on_event("startup")
@@ -666,6 +681,139 @@ def grey_import_flags(lookback_days: int = 120, min_deviation_pct: float = 15):
     return GreyImportFlagsResponse(
         lookback_days=safe_days,
         min_deviation_pct=safe_dev,
+        total_flags=len(items),
+        items=items,
+    )
+
+
+@app.get(
+    "/analytics/grey-import/by-ean/{ean}",
+    response_model=GreyImportByEanResponse,
+)
+def grey_import_by_ean(
+    ean: str,
+    lookback_days: int = 120,
+    min_deviation_pct: float = 15,
+    country_codes: str | None = None,
+):
+    safe_days = max(7, min(lookback_days, 3650))
+    safe_dev = max(1, min(min_deviation_pct, 95))
+    from_ts = datetime.now(timezone.utc) - timedelta(days=safe_days)
+
+    allowed_markets = set(_allowed_markets())
+    requested_markets = _parse_country_codes_csv(country_codes)
+    if requested_markets:
+        invalid = [code for code in requested_markets if code not in allowed_markets]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported markets requested: {', '.join(invalid)}. Allowed: {', '.join(sorted(allowed_markets))}",
+            )
+        selected_markets = requested_markets
+    else:
+        selected_markets = _default_markets()
+
+    with engine.begin() as conn:
+        product_row = conn.execute(
+            text("select id from products where ean = :ean limit 1"),
+            {"ean": ean},
+        ).mappings().first()
+        if not product_row:
+            return GreyImportByEanResponse(
+                ean=ean,
+                lookback_days=safe_days,
+                min_deviation_pct=safe_dev,
+                country_codes=[code.lower() for code in selected_markets],
+                total_flags=0,
+                items=[],
+            )
+
+        product_id = str(product_row["id"])
+        market_params: dict[str, str] = {}
+        placeholders = []
+        for idx, market in enumerate(selected_markets):
+            key = f"market_{idx}"
+            market_params[key] = market
+            placeholders.append(f":{key}")
+        market_filter = ", ".join(placeholders) if placeholders else "''"
+
+        query = f"""
+            with latest_offers as (
+              select ro.product_id, ro.competitor_id, ro.market, ro.effective_price, ro.captured_at
+              from reseller_offers ro
+              join (
+                select product_id, competitor_id, market, max(captured_at) as max_captured_at
+                from reseller_offers
+                group by product_id, competitor_id, market
+              ) m
+                on ro.product_id = m.product_id
+               and ro.competitor_id = m.competitor_id
+               and ro.market = m.market
+               and ro.captured_at = m.max_captured_at
+              where ro.product_id = :product_id
+                and ro.market in ({market_filter})
+            ),
+            sales_stats as (
+              select
+                product_id,
+                avg(sold_price) as avg_sold_price,
+                min(sold_price) as min_sold_price
+              from internal_sales_lines
+              where product_id = :product_id
+                and sold_at >= :from_ts
+              group by product_id
+            )
+            select
+              p.id as product_id,
+              p.sku as product_sku,
+              p.ean as product_ean,
+              p.name as product_name,
+              lo.market,
+              c.name as reseller,
+              lo.effective_price as observed_price,
+              ss.min_sold_price as baseline_min_sold_price,
+              ss.avg_sold_price as baseline_avg_sold_price,
+              round(((ss.min_sold_price - lo.effective_price) / nullif(ss.min_sold_price, 0)) * 100.0, 2) as deviation_pct_vs_min,
+              lo.captured_at
+            from latest_offers lo
+            join sales_stats ss on ss.product_id = lo.product_id
+            join products p on p.id = lo.product_id
+            left join competitors c on c.id = lo.competitor_id
+            where lo.effective_price < ss.min_sold_price * (1 - :min_dev / 100.0)
+            order by deviation_pct_vs_min desc, lo.captured_at desc
+            limit 500
+        """
+
+        params = {
+            "product_id": product_id,
+            "from_ts": from_ts,
+            "min_dev": safe_dev,
+            **market_params,
+        }
+        rows = conn.execute(text(query), params).mappings().all()
+
+    items = [
+        GreyImportFlag(
+            product_id=str(row["product_id"]),
+            product_sku=row["product_sku"],
+            product_ean=row["product_ean"],
+            product_name=row["product_name"],
+            market=row["market"],
+            reseller=row["reseller"],
+            observed_price=float(row["observed_price"]),
+            baseline_min_sold_price=float(row["baseline_min_sold_price"]),
+            baseline_avg_sold_price=float(row["baseline_avg_sold_price"]),
+            deviation_pct_vs_min=float(row["deviation_pct_vs_min"]),
+            captured_at=row["captured_at"],
+        )
+        for row in rows
+    ]
+
+    return GreyImportByEanResponse(
+        ean=ean,
+        lookback_days=safe_days,
+        min_deviation_pct=safe_dev,
+        country_codes=[code.lower() for code in selected_markets],
         total_flags=len(items),
         items=items,
     )
