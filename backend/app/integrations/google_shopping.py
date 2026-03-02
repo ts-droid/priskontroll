@@ -33,6 +33,25 @@ class GoogleShoppingCheckResponse(BaseModel):
     offers: list[GoogleShoppingOffer]
 
 
+class GoogleShoppingCheckMultiRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=300)
+    country_codes: list[str] = Field(min_length=1, max_length=20)
+    language: str = Field(default="sv", min_length=2, max_length=5)
+    max_results: int = Field(default=10, ge=1, le=50)
+    verify_with_scraperdog: bool = False
+
+
+class GoogleShoppingCountryResult(BaseModel):
+    country_code: str
+    result: GoogleShoppingCheckResponse
+
+
+class GoogleShoppingCheckMultiResponse(BaseModel):
+    query: str
+    country_codes: list[str]
+    results: list[GoogleShoppingCountryResult]
+
+
 def _extract_price_value(raw: str | None) -> float | None:
     if not raw:
         return None

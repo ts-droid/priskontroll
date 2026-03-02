@@ -6,6 +6,7 @@ Detta repo innehåller en konkret grundspec för en prisbevaknings- och prissät
 - Databas-DDL: `db/schema.sql`
 - Connector-interface: `docs/connectors/interface.md`
 - Google Shopping-check i backend via Serper + valfri Scraperdog-verifiering
+- Multi-country EAN/UPC-check och enkel UI: `GET /ui/ean-check`
 
 ## Körbar backend-bas
 
