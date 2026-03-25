@@ -30,4 +30,4 @@ uvicorn app.main:app --reload
 
 Målet är att fortsätta bygga API-endpoints och datamodeller enligt OpenAPI/DDL-specen.
 
-- PriceRunner Product API och Agentic Product API integration i backend
+- PriceRunner Product API integration i backend

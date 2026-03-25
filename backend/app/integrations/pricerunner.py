@@ -97,14 +97,17 @@ def _map_brand_name(brand: dict[str, Any] | None) -> str | None:
 
 
 def _map_search_product(item: dict[str, Any]) -> PriceRunnerSearchProduct:
+    product_identifier = item.get("productIdentifier")
+    if not product_identifier and item.get("id") is not None:
+        product_identifier = str(item.get("id"))
     return PriceRunnerSearchProduct(
-        product_identifier=item.get("productIdentifier"),
+        product_identifier=product_identifier,
         name=item.get("name"),
         category_name=item.get("categoryName"),
         subcategory_name=item.get("subcategoryName"),
-        klarna_product_page_url=item.get("klarnaProductPageUrl"),
+        klarna_product_page_url=item.get("klarnaProductPageUrl") or item.get("url"),
         image_url=item.get("imageUrl"),
-        brand_name=_map_brand_name(item.get("brand")),
+        brand_name=_map_brand_name(item.get("brand")) or item.get("brandName"),
     )
 
 
@@ -161,14 +164,14 @@ async def pricerunner_search(
 
     async with httpx.AsyncClient(timeout=25) as client:
         response = await client.get(
-            f"{PRICERUNNER_BASE_URL}/agentic/v1/product/search/{request.market.upper()}",
+            f"{PRICERUNNER_BASE_URL}/public/v0/product/search/{request.market.upper()}",
             headers=_headers(token_id),
             params=params,
         )
         response.raise_for_status()
         data: dict[str, Any] = response.json()
 
-    products = [_map_search_product(item) for item in (data.get("products") or [])]
+    products = [_map_search_product(item) for item in (data.get("searchProducts") or [])]
     return PriceRunnerSearchResponse(
         market=request.market.lower(),
         total_number_of_hits=data.get("totalNumberOfHits"),
@@ -181,20 +184,19 @@ async def pricerunner_offers(
     *,
     token_id: str,
 ) -> PriceRunnerOffersResponse:
-    params: list[tuple[str, str | int]] = []
-    for identifier in request.product_identifiers:
-        params.append(("productIdentifiers", identifier))
+    params: dict[str, str | int] = {
+        "ids": ",".join(request.product_identifiers),
+    }
     if request.min_price is not None:
-        params.append(("minPrice", request.min_price))
+        params["minPrice"] = request.min_price
     if request.max_price is not None:
-        params.append(("maxPrice", request.max_price))
+        params["maxPrice"] = request.max_price
     if request.item_condition_filters:
-        for item in request.item_condition_filters:
-            params.append(("itemConditionFilters", item))
+        params["itemConditionFilters"] = ",".join(request.item_condition_filters)
 
     async with httpx.AsyncClient(timeout=25) as client:
         response = await client.get(
-            f"{PRICERUNNER_BASE_URL}/agentic/v1/product/offers/{request.market.upper()}",
+            f"{PRICERUNNER_BASE_URL}/public/v2/product/offers/{request.market.upper()}/ids",
             headers=_headers(token_id),
             params=params,
         )
@@ -205,7 +207,9 @@ async def pricerunner_offers(
     for item in data.get("productListings") or []:
         listings.append(
             PriceRunnerProductListing(
-                product=_map_product_summary(item.get("product") or {}),
+                product=_map_product_summary(
+                    item.get("product") or item.get("productListingProduct") or {}
+                ),
                 offers=[_map_offer(offer) for offer in (item.get("offers") or [])],
             )
         )

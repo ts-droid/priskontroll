@@ -668,7 +668,7 @@ paths:
 
   /integrations/pricerunner/search:
     post:
-      summary: Search PriceRunner products via Agentic Product API
+      summary: Search PriceRunner products via Product API
       requestBody:
         required: true
         content:
@@ -685,7 +685,7 @@ paths:
 
   /integrations/pricerunner/offers:
     post:
-      summary: Fetch PriceRunner offers by product identifiers via Agentic Product API
+      summary: Fetch PriceRunner offers by product identifiers via Product API
       requestBody:
         required: true
         content:
