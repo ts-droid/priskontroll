@@ -31,3 +31,7 @@ uvicorn app.main:app --reload
 Målet är att fortsätta bygga API-endpoints och datamodeller enligt OpenAPI/DDL-specen.
 
 - PriceRunner Product API integration i backend
+
+## Railway build files
+
+Repo-roten innehaller nu `requirements.txt`, `Procfile` och `main.py` sa att Railway/Railpack kan identifiera projektet som en Python-app direkt.
