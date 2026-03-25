@@ -22,6 +22,9 @@ Endpoints:
 - `GET /ui/ean-check`
 - `POST /integrations/google-shopping/check`
 - `POST /integrations/google-shopping/check-multi`
+- `POST /integrations/pricerunner/search`
+- `POST /integrations/pricerunner/offers`
+- `GET /integrations/pricerunner/offers/by-gtin/{country_code}/{gtin14}`
 - `POST /integrations/internal-sales/import`
 - `GET /analytics/internal-sales/by-ean/{ean}`
 - `GET /analytics/grey-import/flags`
@@ -132,4 +135,43 @@ curl -sS -X POST "http://127.0.0.1:8000/authorized-resellers/domains/bulk-upsert
 ```bash
 cd backend
 python3 seed.py
+```
+
+
+## PriceRunner
+
+Miljovariabel:
+
+- `PRICERUNNER_TOKEN_ID=<din-token>`
+
+Exempel: sök produkter
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/integrations/pricerunner/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "market":"se",
+    "query":"Satechi USB-C Hub",
+    "size":10,
+    "offset":0,
+    "sort_orders":"POPULARITY"
+  }'
+```
+
+Exempel: offers via PriceRunner produktidentifierare
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/integrations/pricerunner/offers" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "market":"se",
+    "product_identifiers":["12345678"],
+    "item_condition_filters":["NEW","UNKNOWN"]
+  }'
+```
+
+Exempel: offers direkt via GTIN14/EAN
+
+```bash
+curl -sS "http://127.0.0.1:8000/integrations/pricerunner/offers/by-gtin/se/07312345678901?item_condition_filters=NEW,UNKNOWN"
 ```

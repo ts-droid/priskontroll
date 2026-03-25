@@ -20,6 +20,17 @@ from .integrations.google_shopping import (
     check_google_shopping_prices,
 )
 
+from .integrations.pricerunner import (
+    PriceRunnerGtinOffersRequest,
+    PriceRunnerOffersRequest,
+    PriceRunnerOffersResponse,
+    PriceRunnerSearchRequest,
+    PriceRunnerSearchResponse,
+    pricerunner_offers,
+    pricerunner_offers_by_gtin,
+    pricerunner_search,
+)
+
 app = FastAPI(title="Priskontroll API", version="0.1.0")
 
 COUNTRY_LABELS = {
@@ -239,6 +250,16 @@ def _extract_domain(url: str | None) -> str | None:
         return host or None
     except Exception:
         return None
+
+
+def _require_pricerunner_token() -> str:
+    token_id = os.getenv("PRICERUNNER_TOKEN_ID")
+    if not token_id:
+        raise HTTPException(
+            status_code=400,
+            detail="PRICERUNNER_TOKEN_ID is missing. Add it in backend/.env before calling this endpoint.",
+        )
+    return token_id
 
 
 @app.on_event("startup")
@@ -474,6 +495,85 @@ def ean_check_ui():
   </body>
 </html>
 """
+
+
+@app.post(
+    "/integrations/pricerunner/search",
+    response_model=PriceRunnerSearchResponse,
+)
+async def integrations_pricerunner_search(payload: PriceRunnerSearchRequest):
+    token_id = _require_pricerunner_token()
+    if payload.market.upper() not in set(_allowed_markets()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported market requested: {payload.market.upper()}. Allowed: {', '.join(sorted(set(_allowed_markets())))}",
+        )
+    try:
+        return await pricerunner_search(payload, token_id=token_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"PriceRunner upstream error: {exc.response.status_code}",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Network error: {exc}") from exc
+
+
+@app.post(
+    "/integrations/pricerunner/offers",
+    response_model=PriceRunnerOffersResponse,
+)
+async def integrations_pricerunner_offers(payload: PriceRunnerOffersRequest):
+    token_id = _require_pricerunner_token()
+    if payload.market.upper() not in set(_allowed_markets()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported market requested: {payload.market.upper()}. Allowed: {', '.join(sorted(set(_allowed_markets())))}",
+        )
+    try:
+        return await pricerunner_offers(payload, token_id=token_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"PriceRunner upstream error: {exc.response.status_code}",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Network error: {exc}") from exc
+
+
+@app.get(
+    "/integrations/pricerunner/offers/by-gtin/{country_code}/{gtin14}",
+    response_model=PriceRunnerOffersResponse,
+)
+async def integrations_pricerunner_offers_by_gtin(
+    country_code: str,
+    gtin14: str,
+    min_price: int | None = None,
+    max_price: int | None = None,
+    item_condition_filters: str | None = "NEW,UNKNOWN",
+):
+    token_id = _require_pricerunner_token()
+    if country_code.upper() not in set(_allowed_markets()):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported market requested: {country_code.upper()}. Allowed: {', '.join(sorted(set(_allowed_markets())))}",
+        )
+    payload = PriceRunnerGtinOffersRequest(
+        country_code=country_code.lower(),
+        gtin14=gtin14,
+        min_price=min_price,
+        max_price=max_price,
+        item_condition_filters=item_condition_filters,
+    )
+    try:
+        return await pricerunner_offers_by_gtin(payload, token_id=token_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"PriceRunner upstream error: {exc.response.status_code}",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Network error: {exc}") from exc
 
 
 @app.post(

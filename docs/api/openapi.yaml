@@ -666,6 +666,75 @@ paths:
                     items:
                       $ref: "#/components/schemas/OfferCaptureRun"
 
+  /integrations/pricerunner/search:
+    post:
+      summary: Search PriceRunner products via Agentic Product API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceRunnerSearchRequest"
+      responses:
+        "200":
+          description: PriceRunner search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceRunnerSearchResponse"
+
+  /integrations/pricerunner/offers:
+    post:
+      summary: Fetch PriceRunner offers by product identifiers via Agentic Product API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceRunnerOffersRequest"
+      responses:
+        "200":
+          description: PriceRunner product listings and offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceRunnerOffersResponse"
+
+  /integrations/pricerunner/offers/by-gtin/{country_code}/{gtin14}:
+    get:
+      summary: Fetch PriceRunner offers by GTIN14 via Product API v2
+      parameters:
+        - in: path
+          name: country_code
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: gtin14
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: min_price
+          schema:
+            type: integer
+        - in: query
+          name: max_price
+          schema:
+            type: integer
+        - in: query
+          name: item_condition_filters
+          schema:
+            type: string
+            default: NEW,UNKNOWN
+      responses:
+        "200":
+          description: PriceRunner GTIN product listing and offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceRunnerOffersResponse"
+
   /integrations/google-shopping/check:
     post:
       summary: Check prices from Google Shopping via Serper, with optional Scraperdog verification
@@ -1685,6 +1754,188 @@ components:
         stats:
           type: object
           additionalProperties: true
+
+    PriceRunnerSearchRequest:
+      type: object
+      required: [market, query]
+      properties:
+        market:
+          type: string
+        query:
+          type: string
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+        sort_orders:
+          type: string
+          nullable: true
+
+    PriceRunnerOffersRequest:
+      type: object
+      required: [market, product_identifiers]
+      properties:
+        market:
+          type: string
+        product_identifiers:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+        min_price:
+          type: integer
+          nullable: true
+        max_price:
+          type: integer
+          nullable: true
+        item_condition_filters:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    PriceRunnerOffer:
+      type: object
+      properties:
+        offer_name:
+          type: string
+          nullable: true
+        offer_url:
+          type: string
+          nullable: true
+        direct_url:
+          type: string
+          nullable: true
+        gtin14:
+          type: string
+          nullable: true
+        stock_status:
+          type: string
+          nullable: true
+        item_condition:
+          type: string
+          nullable: true
+        merchant_name:
+          type: string
+          nullable: true
+        merchant_product_sku:
+          type: string
+          nullable: true
+        merchant_logo_url:
+          type: string
+          nullable: true
+        international:
+          type: boolean
+          nullable: true
+        price_value:
+          type: string
+          nullable: true
+        price_currency:
+          type: string
+          nullable: true
+        shipping_cost_value:
+          type: string
+          nullable: true
+        shipping_cost_currency:
+          type: string
+          nullable: true
+        verified:
+          type: boolean
+          nullable: true
+
+    PriceRunnerProductSummary:
+      type: object
+      properties:
+        product_identifier:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        category_name:
+          type: string
+          nullable: true
+        subcategory_name:
+          type: string
+          nullable: true
+        klarna_product_page_url:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          nullable: true
+        brand_name:
+          type: string
+          nullable: true
+
+    PriceRunnerSearchProduct:
+      type: object
+      properties:
+        product_identifier:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        category_name:
+          type: string
+          nullable: true
+        subcategory_name:
+          type: string
+          nullable: true
+        klarna_product_page_url:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          nullable: true
+        brand_name:
+          type: string
+          nullable: true
+
+    PriceRunnerSearchResponse:
+      type: object
+      required: [market, products]
+      properties:
+        market:
+          type: string
+        total_number_of_hits:
+          type: integer
+          nullable: true
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceRunnerSearchProduct"
+
+    PriceRunnerProductListing:
+      type: object
+      required: [product, offers]
+      properties:
+        product:
+          $ref: "#/components/schemas/PriceRunnerProductSummary"
+        offers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceRunnerOffer"
+
+    PriceRunnerOffersResponse:
+      type: object
+      required: [market, total_product_listings, product_listings]
+      properties:
+        market:
+          type: string
+        total_product_listings:
+          type: integer
+        product_listings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceRunnerProductListing"
 
     GoogleShoppingCheckRequest:
       type: object
